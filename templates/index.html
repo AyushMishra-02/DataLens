@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DataLens — Automated EDA Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- Animated background particles -->
+<div class="bg-particles">
+  <div class="particle"></div>
+  <div class="particle"></div>
+  <div class="particle"></div>
+  <div class="particle"></div>
+  <div class="particle"></div>
+</div>
+
+<header>
+  <div class="header-content">
+    <div class="logo">
+      <span class="logo-icon">🔍</span>
+      <div>
+        <h1>DataLens</h1>
+        <p class="tagline">Automated Data Cleaning & Exploratory Data Analysis</p>
+      </div>
+    </div>
+    <div class="header-badges">
+      <span class="tech-badge">Python</span>
+      <span class="tech-badge">Flask</span>
+      <span class="tech-badge">Pandas</span>
+      <span class="tech-badge">Seaborn</span>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+  <!-- Upload Section -->
+  <div class="upload-section">
+    <div class="upload-box" id="dropZone">
+      <div class="upload-icon">📂</div>
+      <h3>Upload your CSV dataset</h3>
+      <p class="upload-hint">Drag & drop your file here, or click to browse</p>
+      <input type="file" id="fileInput" accept=".csv">
+      <label for="fileInput" class="upload-btn">Choose File</label>
+      <div id="filename" class="filename">No file selected</div>
+      <button id="analyze" onclick="analyze()">
+        <span class="btn-icon">🚀</span> Run EDA Analysis
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div id="loading">
+    <div class="loading-spinner"></div>
+    <p>Analysing your dataset...</p>
+    <span class="loading-sub">Running statistical tests, generating visualizations & detecting outliers</span>
+  </div>
+
+  <!-- Results Section -->
+  <div id="results">
+    <!-- Dataset Overview -->
+    <div class="card animate-in">
+      <div class="card-header">
+        <span class="card-icon">📊</span>
+        <h2>Dataset Overview</h2>
+      </div>
+      <div class="stat-grid" id="overview"></div>
+    </div>
+
+    <!-- Missing Values & Outliers -->
+    <div class="card animate-in">
+      <div class="card-header">
+        <span class="card-icon">🧹</span>
+        <h2>Missing Values & Outliers</h2>
+      </div>
+      <div class="table-wrapper">
+        <table id="missing-table">
+          <thead>
+            <tr>
+              <th>Column</th>
+              <th>Data Type</th>
+              <th>Missing</th>
+              <th>Missing %</th>
+              <th>Outliers (z&gt;3)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Missing Values Plot -->
+    <div class="card animate-in" id="missing-plot-card" style="display:none;">
+      <div class="card-header">
+        <span class="card-icon">📉</span>
+        <h2>Missing Values Visualization</h2>
+      </div>
+      <div class="plot-container">
+        <img id="missing-plot-img" src="" alt="Missing Values">
+      </div>
+    </div>
+
+    <!-- Feature Distributions -->
+    <div class="card animate-in">
+      <div class="card-header">
+        <span class="card-icon">📈</span>
+        <h2>Feature Distributions</h2>
+      </div>
+      <div class="img-grid" id="dist-grid"></div>
+    </div>
+
+    <!-- Correlation Heatmap -->
+    <div class="card animate-in" id="heatmap-card" style="display:none;">
+      <div class="card-header">
+        <span class="card-icon">🔥</span>
+        <h2>Correlation Heatmap</h2>
+      </div>
+      <div class="plot-container heatmap-container">
+        <img id="heatmap-img" src="" alt="Correlation Heatmap">
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <p>Built with ❤️ by <strong>Ayush Mishra</strong> · DataLens v1.0 · ML Summer School 2026</p>
+</footer>
+
+<script>
+  // Drag and drop support
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+
+  ['dragenter', 'dragover'].forEach(evt => {
+    dropZone.addEventListener(evt, e => {
+      e.preventDefault();
+      dropZone.classList.add('drag-over');
+    });
+  });
+
+  ['dragleave', 'drop'].forEach(evt => {
+    dropZone.addEventListener(evt, e => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+    });
+  });
+
+  dropZone.addEventListener('drop', e => {
+    const files = e.dataTransfer.files;
+    if (files.length) {
+      fileInput.files = files;
+      document.getElementById('filename').textContent = files[0].name;
+    }
+  });
+
+  fileInput.addEventListener('change', function() {
+    document.getElementById('filename').textContent = this.files[0]?.name || 'No file selected';
+  });
+
+  async function analyze() {
+    const file = fileInput.files[0];
+    if (!file) { alert('Please select a CSV file first'); return; }
+    const formData = new FormData();
+    formData.append('file', file);
+
+    document.getElementById('loading').style.display = 'flex';
+    document.getElementById('results').style.display = 'none';
+
+    try {
+      const res = await fetch('/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      document.getElementById('loading').style.display = 'none';
+      if (data.error) { alert('Error: ' + data.error); return; }
+      renderResults(data);
+    } catch (err) {
+      document.getElementById('loading').style.display = 'none';
+      alert('Network error: ' + err.message);
+    }
+  }
+
+  function renderResults(d) {
+    // Overview cards
+    document.getElementById('overview').innerHTML = `
+      <div class="stat-card">
+        <div class="stat-icon">📋</div>
+        <div class="val">${d.shape[0].toLocaleString()}</div>
+        <div class="lbl">Total Rows</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📐</div>
+        <div class="val">${d.shape[1]}</div>
+        <div class="lbl">Columns</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🔄</div>
+        <div class="val">${d.duplicates}</div>
+        <div class="lbl">Duplicates</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">✅</div>
+        <div class="val">${d.cleaned_shape[0].toLocaleString()}</div>
+        <div class="lbl">Rows After Cleaning</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⚠️</div>
+        <div class="val">${Object.keys(d.missing).filter(k => d.missing[k] > 0).length}</div>
+        <div class="lbl">Cols with Missing</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🎯</div>
+        <div class="val">${Object.values(d.outliers).reduce((a, b) => a + b, 0)}</div>
+        <div class="lbl">Total Outliers</div>
+      </div>
+    `;
+
+    // Missing values table
+    const tbody = document.querySelector('#missing-table tbody');
+    tbody.innerHTML = '';
+    d.columns.forEach(col => {
+      const m = d.missing[col] || 0;
+      const mp = d.missing_pct[col] || 0;
+      const o = d.outliers[col] ?? '—';
+      const dtype = d.dtypes[col] || '—';
+      tbody.innerHTML += `<tr>
+        <td><strong>${col}</strong></td>
+        <td><code>${dtype}</code></td>
+        <td>${m > 0 ? `<span class="badge danger">${m}</span>` : `<span class="badge ok">0</span>`}</td>
+        <td>${mp > 0 ? `<span class="pct-warn">${mp}%</span>` : `${mp}%`}</td>
+        <td>${typeof o === 'number' && o > 0 ? `<span class="badge warn">${o}</span>` : o}</td>
+      </tr>`;
+    });
+
+    // Missing values plot
+    if (d.missing_plot) {
+      document.getElementById('missing-plot-img').src = `data:image/png;base64,${d.missing_plot}`;
+      document.getElementById('missing-plot-card').style.display = 'block';
+    } else {
+      document.getElementById('missing-plot-card').style.display = 'none';
+    }
+
+    // Distribution plots
+    const grid = document.getElementById('dist-grid');
+    grid.innerHTML = '';
+    Object.entries(d.dist_imgs).forEach(([col, img]) => {
+      grid.innerHTML += `<div class="dist-item">
+        <img src="data:image/png;base64,${img}" alt="${col}">
+      </div>`;
+    });
+
+    // Heatmap
+    if (d.heatmap) {
+      document.getElementById('heatmap-img').src = `data:image/png;base64,${d.heatmap}`;
+      document.getElementById('heatmap-card').style.display = 'block';
+    } else {
+      document.getElementById('heatmap-card').style.display = 'none';
+    }
+
+    document.getElementById('results').style.display = 'block';
+
+    // Trigger animations
+    document.querySelectorAll('.animate-in').forEach((el, i) => {
+      el.style.animationDelay = `${i * 0.1}s`;
+    });
+  }
+</script>
+</body>
+</html>
