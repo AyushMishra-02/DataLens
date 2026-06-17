@@ -167,7 +167,7 @@ Body: file=<your_dataset.csv>
 
 ## 👤 Author
 
-**Ayush Mishra** — ML Summer School 2026
+**Ayush Mishra**
 
 ---
 
