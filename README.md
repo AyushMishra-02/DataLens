@@ -165,7 +165,7 @@ Body: file=<your_dataset.csv>
 
 ## Production 
 
-**You can find the Live Demo here** : Available at your primary URL https://datalens-yd7g.onrender.com
+**You can find the Live Demo here** : https://datalens-yd7g.onrender.com
 
 ---
 
